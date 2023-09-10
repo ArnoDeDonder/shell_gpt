@@ -10,6 +10,7 @@ from .config import cfg
 CACHE_LENGTH = int(cfg.get("CACHE_LENGTH"))
 CACHE_PATH = Path(cfg.get("CACHE_PATH"))
 REQUEST_TIMEOUT = int(cfg.get("REQUEST_TIMEOUT"))
+USE_AZURE_GPT = bool(cfg.get("USE_AZURE_GPT"))
 
 
 class OpenAIClient:
@@ -37,6 +38,20 @@ class OpenAIClient:
         :param top_probability: Float in 0.0 - 1.0 range.
         :return: Response body JSON.
         """
+        if USE_AZURE_GPT and "3.5" in model:
+            model = model.replace("3.5", "35")
+        if USE_AZURE_GPT:
+            headers = {
+                "Content-Type": "application/json",
+                "api-key": f"{self.api_key}",
+            }
+            endpoint = f"{self.api_host}/openai/deployments/{AZURE_OPENAI_ENGINE}/chat/completions?api-version=2023-03-15-preview"
+        else:
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.api_key}",
+            }
+            endpoint = f"{self.api_host}/v1/chat/completions"
         data = {
             "messages": messages,
             "model": model,
@@ -47,11 +62,7 @@ class OpenAIClient:
         endpoint = f"{self.api_host}/v1/chat/completions"
         response = requests.post(
             endpoint,
-            # Hide API key from Rich traceback.
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.__api_key}",
-            },
+            headers=headers
             json=data,
             timeout=REQUEST_TIMEOUT,
             stream=True,
